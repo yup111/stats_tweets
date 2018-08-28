@@ -18,7 +18,6 @@ import functools
 import multiprocessing as mp
 import common
 import langid
-from preprocess import sanitize
 from geocoding.tweet_us_state_geocoder import TweetUSStateGeocoder
 import hashlib
 
@@ -60,15 +59,14 @@ def read_folder_worker(tweets_json_gzip):
 
                         tweets.append({
                             'id': tweet['id'],
-                            'text':common.clean_tweet_text(tweet['text']),
-                            'clean_text':sanitize(tweet['text']),
+                            'text':tweet['text'],
+                            'clean_text':common.clean_tweet_text(tweet['text']),
                             'place': tweet['place'] if 'place' in tweet else '',
                             'user_location': tweet['user']['location'],
                             'created_at': tweet['created_at'],
                             'username': tweet['user']['name'],
                             'user_id': tweet['user']['id'],
                             'month': common.time_str_to_month(tweet['created_at']),
-                            "filename": tweets_json_gzip,
                             'week': common.time_str_to_week(tweet['created_at']),
                             'state': us_state
                             })
@@ -89,7 +87,7 @@ def read_folder_callback(future, all_tweets = {}):
 
         all_tweets[tweet['month']].append(tweet)
 
-def stats_by_month(all_tweets, outputfilename):
+def stats_by_month(all_tweets):
     stats = {}
 
     tweetids = set()
@@ -132,8 +130,17 @@ def write_csv(dicts, filename, headnames):
         writer = csv.DictWriter(csv_f, fieldnames=headnames, delimiter=',', quoting=csv.QUOTE_ALL)
         writer.writeheader()
 
-        for month, stat in stats.items():
-            writer.writerow(stat)
+        for month, tweets in dicts.items():
+            for tweet in tweets:
+                writer.writerow(tweet)
+
+def write_stats_csv(dicts, filename, headnames):
+    with open(filename, 'a+', newline='', encoding='utf-8') as csv_f:
+        writer = csv.DictWriter(csv_f, fieldnames=headnames, delimiter=',', quoting=csv.QUOTE_ALL)
+        writer.writeheader()
+
+        for month, value in dicts.items():
+            writer.writerow(value)
 
 def read_folder(input_folder):
         start_time = time.time()
@@ -166,8 +173,8 @@ if __name__ == "__main__":
     logger.addHandler(handler)
     logger.info(sys.version)
 
-    all_tweets = read_folder('./')
-    write_csv(all_tweets, "give a name", [
+    all_tweets = read_folder('./lungcancer')
+    write_csv(all_tweets, "lungcancer_text_data.csv", [
                                         'id',
                                         'text',
                                         'clean_text',
@@ -181,8 +188,11 @@ if __name__ == "__main__":
                                         'state'
                                         ])
 
+    # print(all_tweets)
+
     stats = stats_by_month(all_tweets)
-    write_csv(stats, "give a name",  [
+
+    write_stats_csv(stats, "lungcancer_stats_res.csv",  [
                                     'month',
                                     'total',
                                     'after_filter',
